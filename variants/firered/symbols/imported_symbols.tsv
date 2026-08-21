@@ -1,4 +1,4 @@
-# addr	mode	name  (STT_FUNC from byte-matching ELF)
+# addr	mode	name  (STT_FUNC from a byte-matching decomp ELF; blank name = let the finder synthesise one)
 0x080003A4	thumb	AgbMain
 0x080004B0	thumb	UpdateLinkAndCallCallbacks
 0x080004C4	thumb	InitMainCallbacks

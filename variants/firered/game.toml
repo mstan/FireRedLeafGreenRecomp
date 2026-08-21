@@ -27,9 +27,54 @@ path = "roms/firered_usa.gba"   # user-provided; gitignored
 # sha1 is filled in per region in config/<region>.toml (rev0 = 41cb23d8…).
 
 # ── Recompiler entry & layout (consumed by gba_recompile) ───────────
-# NOTE: the actual recompile is driven by symbols/firered.toml (the import
-# tool's output: identity sha1 + extra_func + data_range). These fields are
-# kept for documentation / discoverability.
+# ── Recompiler program identity (consumed by gba_recompile) ─────────
+#
+# This file is the BASE config for the recompile: it owns [program] and
+# [identity] and wins every conflict with the generated overlay layered on
+# top of it (symbols/BPRE_symbols.toml).
+#
+# Until 2026-08-21 the recompile was driven by the importer's generated
+# symbols/firered.toml INSTEAD of this file, because only that file carried a
+# [program] table — so every import replaced the hand-authored config and
+# nothing reviewed could survive one. These values are carried over verbatim.
+[program]
+name         = "Pokemon FireRed Version (USA)"
+id           = "firered_usa"
+load_address = 0x08000000
+size         = 0x01000000
+entry_pc     = 0x08000000
+codegen_shards = 64
+
+[identity]
+sha1 = "41cb23d8dccc8ebd7c649cd8fbb58eeace6e2fdc"
+
+# ── Runtime code copy that is NOT symbol-derivable ──────────────────
+#
+# ReadFlashId stack-copies the tiny ReadFlash1 helper (via SetReadFlash1)
+# into a stack local before reading the flash chip's manufacturer/device ID.
+# The destination is a stack address, so unlike the IntrMain and SoundMainRAM
+# copies there is no destination SYMBOL for the importer to resolve — it has
+# to be stated here, and it is deterministic for this boot path.
+#
+# This is load-bearing, not an optimization: without it ReadFlash1 is not
+# statically recompiled, flash detection fails, gFlashMemoryPresent stays
+# FALSE, and AgbMain hands SetMainCallback2 a NULL callback — the game boots
+# to a black screen and never recovers.
+[[code_copy]]
+runtime_start = 0x03007DCC
+source_start  = 0x081DEA30
+size          = 0x4
+name          = "ReadFlash1_stack_Buffer"
+note = "ReadFlashId stack-copies ReadFlash1 via SetReadFlash1 into readFlash1Buffer"
+
+[[extra_func]]
+addr = 0x03007DCC
+mode = "thumb"
+name = "ReadFlash1_stack"
+note = "THUMB entry of the ReadFlash1 stack copy above"
+
+# NOTE: the fields below are consumed by the runner/tooling; the recompile's
+# seeds come from --symbols and its data ranges from the overlay.
 [recompiler]
 entry_point   = "0x08000000"
 seeds         = "symbols/imported_symbols.tsv"

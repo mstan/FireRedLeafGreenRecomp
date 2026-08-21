@@ -21,6 +21,51 @@ sha1 = "300c20df6731a33952ded8c436f7f186d25d3492"
 path = "roms/leafgreen_usa.gba"   # user-provided; gitignored (rev0/v1.0, 574fa542…)
 # sha1 filled in per region in config/<region>.toml.
 
+# ── Recompiler program identity (consumed by gba_recompile) ─────────
+#
+# This file is the BASE config for the recompile: it owns [program] and
+# [identity] and wins every conflict with the generated overlays layered on
+# top of it (symbols/BPGE_symbols.toml, symbols/BPGE_reviewed_seeds.toml).
+#
+# Until 2026-08-21 the recompile was driven by the importer's generated
+# symbols/leafgreen_usa.toml INSTEAD of this file, because only that file
+# carried a [program] table — so every import replaced the hand-authored
+# config and nothing reviewed could survive one. Values carried over verbatim.
+[program]
+name         = "Pokemon LeafGreen Version (USA)"
+id           = "leafgreen_usa"
+load_address = 0x08000000
+size         = 0x01000000
+entry_pc     = 0x08000000
+
+[identity]
+sha1 = "574fa542ffebb14be69902d1d36f1ec0a4afd71e"
+
+# ── Runtime code copy that is NOT symbol-derivable ──────────────────
+#
+# ReadFlashId stack-copies the tiny ReadFlash1 helper (via SetReadFlash1)
+# into a stack local before reading the flash chip's ID. The destination is a
+# stack address, so unlike the IntrMain and SoundMainRAM copies there is no
+# destination SYMBOL for the importer to resolve — it has to be stated here.
+# FireRed and LeafGreen share crt0/boot, hence the same 0x03007DCC; only the
+# ROM-side source differs (each game's own ReadFlash1).
+#
+# Load-bearing: without it ReadFlash1 is not statically recompiled, flash
+# detection fails, gFlashMemoryPresent stays FALSE, and AgbMain hands
+# SetMainCallback2 a NULL callback — black screen, never boots.
+[[code_copy]]
+runtime_start = 0x03007DCC
+source_start  = 0x081DEA0C
+size          = 0x4
+name          = "ReadFlash1_stack_Buffer"
+note = "ReadFlashId stack-copies ReadFlash1 via SetReadFlash1 into readFlash1Buffer"
+
+[[extra_func]]
+addr = 0x03007DCC
+mode = "thumb"
+name = "ReadFlash1_stack"
+note = "THUMB entry of the ReadFlash1 stack copy above"
+
 [recompiler]
 entry_point   = "0x08000000"
 seeds         = "symbols/imported_symbols.tsv"

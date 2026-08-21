@@ -1,0 +1,170 @@
+# Reviewed dispatch-miss seeds — HAND-OWNED, not importer output.
+#
+# Pokemon LeafGreen Version (USA)
+#
+# Each entry is an interior guest PC that is a legitimate resume
+# point but not a function entry: an IRQ or SWI returns into the
+# middle of an already-generated body (the WaitForVBlank busy
+# spin, the m4a mixer, libgcc's memcpy/divsi). Static discovery
+# cannot reach them, so without a seed here each one dispatch
+# misses and gets bridged through the interpreter.
+#
+# They were found from the self-heal miss log and reviewed by
+# hand. This file is a CONFIG OVERLAY layered on game.toml and is
+# never written by the importer, so re-importing symbols cannot
+# lose them. Add new ones only after reviewing a miss log entry.
+#
+# Migrated 2026-08-21 out of the importer's generated TOML, which
+# used to double as the recompile config.
+
+# Must match the base config: these are exact addresses in
+# one specific binary.
+[identity]
+sha1 = "574fa542ffebb14be69902d1d36f1ec0a4afd71e"
+
+[[extra_func]]
+addr = 0x080008AC
+mode = "thumb"
+resume = true
+name = "resume_080008ac"
+note = "reviewed dispatch-miss seed: WaitForVBlank spin resume"
+
+[[extra_func]]
+addr = 0x080008AE
+mode = "thumb"
+resume = true
+name = "resume_080008ae"
+note = "reviewed dispatch-miss seed: WaitForVBlank spin resume"
+
+[[extra_func]]
+addr = 0x080008B0
+mode = "thumb"
+resume = true
+name = "resume_080008b0"
+note = "reviewed dispatch-miss seed: WaitForVBlank spin resume"
+
+[[extra_func]]
+addr = 0x080008B2
+mode = "thumb"
+resume = true
+name = "resume_080008b2"
+note = "reviewed dispatch-miss seed: WaitForVBlank spin resume"
+
+[[extra_func]]
+addr = 0x08004C32
+mode = "thumb"
+resume = true
+name = "resume_08004c32"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x08004C3A
+mode = "thumb"
+resume = true
+name = "resume_08004c3a"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x08004C3C
+mode = "thumb"
+resume = true
+name = "resume_08004c3c"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x08004C46
+mode = "thumb"
+resume = true
+name = "resume_08004c46"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x080074BA
+mode = "thumb"
+resume = true
+name = "resume_080074ba"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x080074BC
+mode = "thumb"
+resume = true
+name = "resume_080074bc"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x080074C2
+mode = "thumb"
+resume = true
+name = "resume_080074c2"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x0800752A
+mode = "thumb"
+resume = true
+name = "resume_0800752a"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x0800752C
+mode = "thumb"
+resume = true
+name = "resume_0800752c"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x08007530
+mode = "thumb"
+resume = true
+name = "resume_08007530"
+note = "reviewed dispatch-miss seed: irq-return interior resume"
+
+[[extra_func]]
+addr = 0x081DD060
+mode = "thumb"
+resume = true
+name = "resume_081dd060"
+note = "reviewed dispatch-miss seed: m4a interior resume"
+
+[[extra_func]]
+addr = 0x081DD732
+mode = "thumb"
+resume = true
+name = "resume_081dd732"
+note = "reviewed dispatch-miss seed: m4a interior resume"
+
+[[extra_func]]
+addr = 0x081DE85E
+mode = "thumb"
+resume = true
+name = "resume_081de85e"
+note = "reviewed dispatch-miss seed: m4a interior resume"
+
+[[extra_func]]
+addr = 0x081DE8AA
+mode = "thumb"
+resume = true
+name = "resume_081de8aa"
+note = "reviewed dispatch-miss seed: m4a interior resume"
+
+[[extra_func]]
+addr = 0x081E34DA
+mode = "thumb"
+resume = true
+name = "resume_081e34da"
+note = "reviewed dispatch-miss seed: m4a interior resume"
+
+[[extra_func]]
+addr = 0x081E34DC
+mode = "thumb"
+resume = true
+name = "resume_081e34dc"
+note = "reviewed dispatch-miss seed: m4a interior resume"
+
+[[extra_func]]
+addr = 0x081E5E74
+mode = "thumb"
+resume = true
+name = "resume_081e5e74"
+note = "reviewed dispatch-miss seed: m4a interior resume"

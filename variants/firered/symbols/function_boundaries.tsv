@@ -1,4 +1,4 @@
-# start	end	mode	name  (end = start+size-1, exact)
+# start	end	mode	name  (end = start+size-1; 0 = size unknown)
 0x080003A4	0x080004AF	thumb	AgbMain
 0x080004B0	0x080004C3	thumb	UpdateLinkAndCallCallbacks
 0x080004C4	0x0800050F	thumb	InitMainCallbacks
