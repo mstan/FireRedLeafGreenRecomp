@@ -5,6 +5,18 @@ Generalized form of import_pokefirered_gold.py: works for ANY pret GBA decomp
 (pokefirered/leafgreen, pokeruby ruby/sapphire, pokeemerald) by taking the
 program name + id on the command line instead of hardcoding FireRed.
 
+SUCCESSOR: gbarecomp/tools/symbol_import/import_decomp_symbols.py is the
+shared, engine-side importer (see gbarecomp/docs/SYMBOL_OVERLAY.md). It is
+game-agnostic — no CODE_COPY_PAIRS / STACK_CODE_COPIES / REVIEWED_SEEDS
+tables — reads link maps as well as ELF section tables, harvests data symbols
+from every memory region rather than ROM only, and emits its TOML as a config
+OVERLAY so a game's hand-authored game.toml is composed with instead of
+replaced. This copy stays in place because the Gen3 games' generated code was
+produced by it and migrating them carries its own regen + revalidation cost;
+prefer the engine-side importer for new work, and treat the per-game tables
+above as the checklist of what a Gen3 migration must reproduce (as explicit
+--code-copy-pair arguments and reviewed game.toml entries).
+
 Consumes a byte-matching decomp build's ELF metadata (produced in WSL):
 
   --syms      readelf -sW <game>.elf   (symbol table; THUMB funcs carry bit0)
