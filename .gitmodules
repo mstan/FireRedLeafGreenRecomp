@@ -4,3 +4,6 @@
 [submodule "gbarecomp"]
 	path = gbarecomp
 	url = https://github.com/mstan/gbarecomp.git
+[submodule "third_party/pokefirered"]
+	path = third_party/pokefirered
+	url = https://github.com/pret/pokefirered
