@@ -144,6 +144,11 @@ cmake --build build --target FireRedRecomp
 (`gba_recompile` is built from the `gbarecomp` checkout; see that repo's README.)
 The recompiled translation unit is large — expect a multi-minute compile.
 
+## License
+
+PolyForm Noncommercial 1.0.0 — see [`LICENSE`](LICENSE). Third-party
+components retain their own licenses.
+
 ## Legal
 
 This project contains **no copyrighted ROM data, no Nintendo BIOS, and no decomp
