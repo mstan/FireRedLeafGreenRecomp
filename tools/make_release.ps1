@@ -27,15 +27,25 @@ Usage: powershell -File tools\make_release.ps1 -Version 0.0.2
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Version,
-  [string]$BuildDir = 'build-release'
+  [string]$BuildDir = 'build-release',
+  [string]$OutputDir = 'release-stage',
+  [string]$EngineRoot = '',
+  [switch]$SkipBuild
 )
 $ErrorActionPreference = 'Stop'
 
 $MingwBin = 'C:\msys64\mingw64\bin'
 $env:PATH = "$MingwBin;$env:PATH"
 $root  = Split-Path -Parent $PSScriptRoot
-$build = Join-Path $root $BuildDir
-$out   = Join-Path $root 'release-stage'
+$build = if ([IO.Path]::IsPathRooted($BuildDir)) { [IO.Path]::GetFullPath($BuildDir) } else { Join-Path $root $BuildDir }
+$out = if ([IO.Path]::IsPathRooted($OutputDir)) { [IO.Path]::GetFullPath($OutputDir) } else { Join-Path $root $OutputDir }
+if ([IO.Path]::GetPathRoot($out) -eq 'C:\') { throw 'Release staging must use non-C: storage' }
+if (-not $EngineRoot) { $EngineRoot = Join-Path $root 'gbarecomp' }
+$engine = (Resolve-Path -LiteralPath $EngineRoot).Path
+$env:TEMP = Join-Path $out '.scratch'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+$Cmake = 'C:\Program Files\CMake\bin\cmake.exe'
 New-Item -ItemType Directory -Force $out | Out-Null
 
 # Games this repo ships: CMake target -> README title + decomp variant (for the
@@ -50,12 +60,13 @@ $dlls = @('SDL2.dll', 'libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthread-1.
 # ../gbarecomp (the engine checkout) via this repo's CMakeLists. SDL2 is located
 # through the msys2 mingw64 prefix - passed explicitly so a fresh checkout
 # configures without relying on auto-detection.
-if (-not (Test-Path (Join-Path $build 'CMakeCache.txt'))) {
-  & cmake -S $root -B $build -G Ninja `
+if (-not $SkipBuild -and -not (Test-Path (Join-Path $build 'CMakeCache.txt'))) {
+  & $Cmake -S $root -B $build -G Ninja `
       -DCMAKE_C_COMPILER="$MingwBin/cc.exe" `
       -DCMAKE_CXX_COMPILER="$MingwBin/c++.exe" `
       -DCMAKE_MAKE_PROGRAM="$MingwBin/ninja.exe" `
       -DCMAKE_BUILD_TYPE=Release "-DCMAKE_CXX_FLAGS_RELEASE=-O1 -DNDEBUG" `
+      "-DGBARECOMP_ROOT=$engine" `
       -DGBARECOMP_BUILD_ORACLE=OFF `
       -DGBARECOMP_MINGW_PREFIX_UNIX="/c/msys64/mingw64" `
       -DSDL2_INCLUDE_DIR="C:/msys64/mingw64/include/SDL2" `
@@ -65,19 +76,23 @@ if (-not (Test-Path (Join-Path $build 'CMakeCache.txt'))) {
 
 foreach ($g in $games) {
   $target = $g.Target
-  & cmake --build $build --target $target
-  if ($LASTEXITCODE -ne 0) { throw "build failed for $target ($LASTEXITCODE)" }
+  if (-not $SkipBuild) {
+    & $Cmake --build $build --target $target
+    if ($LASTEXITCODE -ne 0) { throw "build failed for $target ($LASTEXITCODE)" }
+  }
 
   $exe = Join-Path $build "$target.exe"
   if (-not (Test-Path $exe)) { throw "expected exe missing: $exe" }
-  & "$MingwBin\strip.exe" $exe
 
   $stageName = "$target-windows-x64-v$Version"
   $stage = Join-Path $out $stageName
-  if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+  if (Test-Path -LiteralPath $stage) { throw "Release stage already exists: $stage" }
   New-Item -ItemType Directory -Force $stage | Out-Null
 
-  Copy-Item $exe $stage
+  Copy-Item -LiteralPath $exe -Destination $stage
+  & "$MingwBin\strip.exe" (Join-Path $stage "$target.exe")
+  if ($LASTEXITCODE -ne 0) { throw "strip failed for $target" }
+  Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
   foreach ($d in $dlls) { Copy-Item (Join-Path $MingwBin $d) $stage }
 
   # recomp-ui launcher assets (fonts + img TGAs incl. this variant's box art),
@@ -89,11 +104,17 @@ foreach ($g in $games) {
   }
   Copy-Item $assets -Destination $stage -Recurse
 
+  # Ship only the authored catalog; never copy developer selections or caches.
+  $mods = Join-Path $root 'mods/preloaded'
+  if (-not (Test-Path -LiteralPath (Join-Path $mods 'packages/pokemon-gen3.enhancement.widescreen/1.0.0/manifest.toml'))) {
+    throw "Adaptive Overworld catalog missing: $mods"
+  }
+  Copy-Item -LiteralPath $mods -Destination (Join-Path $stage 'mods') -Recurse
+
   # Bundle the self-contained tcc overlay toolchain (TinyCC + overlay shim
   # headers) next to the exe so a toolchain-less player box self-heals overlay
   # gaps via tcc (overlay backend auto -> tcc). See gbarecomp/tools/fetch_tcc.ps1.
-  $engine = (Resolve-Path (Join-Path $PSScriptRoot '..\gbarecomp')).Path
-  & (Join-Path $engine 'tools\fetch_tcc.ps1') -Toolchain (Join-Path $stage 'overlay_toolchain') -EngineRoot $engine
+  & (Join-Path $engine 'tools\fetch_tcc.ps1') -Toolchain (Join-Path $stage 'overlay_toolchain') -EngineRoot $engine -CacheDir (Join-Path $out ".toolchain-cache-$target")
 
   # ROM SHA-1 from the variant's game.toml (best-effort; for the README only).
   $sha = ''
@@ -124,11 +145,19 @@ Static recompilation turns the game's ARM7TDMI code into native C++ (via the
 
 The ROM and BIOS are **never** redistributed - supply your own dumps.
 
+## Adaptive Overworld
+
+Open **Mods**, enable **Adaptive Overworld**, choose **Fit to screen**, and apply.
+Resize the game window wider or taller to reveal additional scenery and NPCs.
+Field menus follow the expanded edges. Battles and unsupported screens stay centered.
+Distant NPCs use idle poses; their AI and interaction ranges retain native behavior.
+The feature is optional and starts disabled in a fresh extraction.
+
 See the GitHub release notes for what changed in v$Version.
 "@ | Out-File (Join-Path $stage 'README.md') -Encoding utf8
 
   $zip = Join-Path $out "$stageName.zip"
-  if (Test-Path $zip) { Remove-Item -Force $zip }
+  if (Test-Path -LiteralPath $zip) { throw "Release ZIP already exists: $zip" }
   Add-Type -AssemblyName System.IO.Compression
   Add-Type -AssemblyName System.IO.Compression.FileSystem
 
@@ -156,7 +185,7 @@ See the GitHub release notes for what changed in v$Version.
               throw "Refusing to archive a file outside the release stage: $rzFull"
           }
           $rzName = $rzFull.Substring($rzPrefix.Length).Replace('\', '/')
-          if ($rzName.StartsWith('/') -or $rzName -match '(^|/)..(/|$)') {
+          if ($rzName.StartsWith('/') -or $rzName -match '(^|/)\.\.(/|$)') {
               throw "Unsafe ZIP entry name: $rzName"
           }
           [IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
@@ -174,7 +203,7 @@ See the GitHub release notes for what changed in v$Version.
       $rzBad = @($rzArchive.Entries | Where-Object {
           $_.FullName.Contains('\') -or
           $_.FullName.StartsWith('/') -or
-          $_.FullName -match '(^|/)..(/|$)'
+          $_.FullName -match '(^|/)\.\.(/|$)'
       })
       if ($rzBad.Count -ne 0) {
           throw "ZIP contains non-portable entry names: $(

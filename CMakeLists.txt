@@ -34,12 +34,15 @@ endif()
 
 # Pull in the platform core targets (gbarecomp_runtime, gbarecomp_debug,
 # gbarecomp_gba, gbarecomp_armv4t) once; every variant links them.
+set(GBARECOMP_ENABLE_MODS ON CACHE BOOL "Build game-owned mod catalog" FORCE)
 add_subdirectory("${GBARECOMP_ROOT}" gbarecomp_build EXCLUDE_FROM_ALL)
 
 # ─────────────────────────────────────────────────────────────────────
 # verify_rom_hash — refuses to launch a game with an unknown ROM. Shared
 # across variants (it takes the ROM path + expected sha1 as arguments).
 # ─────────────────────────────────────────────────────────────────────
+include("${GBARECOMP_ROOT}/cmake/GbaGen3View.cmake")
+
 add_executable(verify_rom_hash tools/verify_rom_hash/main.cpp)
 
 # ─────────────────────────────────────────────────────────────────────
@@ -64,6 +67,10 @@ function(add_gba_variant TARGET NAME PORT WIN_TITLE GAME_NAME ROM_SHA1 ROM_CRC32
     add_executable(${TARGET}
         src/main.cpp
         ${VARIANT_GENERATED})
+
+    gbarecomp_target_gen3_view(${TARGET} ${NAME})
+    string(TOUPPER "${NAME}" GEN3_VARIANT_NAME)
+    target_compile_definitions(${TARGET} PRIVATE GEN3_VARIANT_${GEN3_VARIANT_NAME}=1)
 
     # Keep the very large generated guest translation units at a bounded
     # optimization/debug-info cost. gba_recompile emits deterministic
@@ -100,7 +107,8 @@ function(add_gba_variant TARGET NAME PORT WIN_TITLE GAME_NAME ROM_SHA1 ROM_CRC32
         GBARECOMP_BUILTIN_NAME="${GAME_NAME}"
         GBARECOMP_BUILTIN_SHA1="${ROM_SHA1}"
         GBARECOMP_BUILTIN_CRC32=${ROM_CRC32}
-        GBARECOMP_BUILTIN_REGION="USA")
+        GBARECOMP_BUILTIN_REGION="USA"
+        GBARECOMP_MOD_GAME_ID="pokemon-${NAME}-us")
 
     if(GBAGAME_RECOMP_UI)
         target_link_libraries(${TARGET} PRIVATE game_launcher_ui)
@@ -141,13 +149,15 @@ endfunction()
 # ─────────────────────────────────────────────────────────────────────
 option(GBAGAME_RECOMP_UI "Build the recomp-ui pre-boot launcher" ON)
 if(GBAGAME_RECOMP_UI)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
+    set(RECOMP_UI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/recomp-ui" CACHE PATH "Path to recomp-ui")
+    include(${RECOMP_UI_ROOT}/recomp_ui.cmake)
     add_library(game_launcher_ui STATIC src/game_launcher_boot.cpp)
     target_include_directories(game_launcher_ui PRIVATE
         "${GBARECOMP_ROOT}/src/runtime"   # launcher_seam.h + runtime.h
         "${GBARECOMP_ROOT}/src/gba"
         src
     )
+    target_compile_definitions(game_launcher_ui PRIVATE GBARECOMP_ENABLE_MODS=1)
     recomp_target_launcher_ui(game_launcher_ui CONSOLE gba)   # sources, includes, RECOMP_LAUNCHER, asset staging
     find_package(SDL2 REQUIRED)
     target_link_libraries(game_launcher_ui PUBLIC SDL2::SDL2)
@@ -165,3 +175,11 @@ add_gba_variant(FireRedRecomp   firered   19852 "FireRedRecomp"
 # v1.0; rev1 7862c67b work archived in ../../../_gen3_leafgreen_rev1_archive/).
 add_gba_variant(LeafGreenRecomp leafgreen 19862 "LeafGreenRecomp"
     "Pokemon LeafGreen (USA)" "574fa542ffebb14be69902d1d36f1ec0a4afd71e" 0xD69C96CC)
+
+# Stage the same hash-gated presentation catalog for both variants.
+foreach(GEN3_TARGET FireRedRecomp LeafGreenRecomp)
+    add_custom_command(TARGET ${GEN3_TARGET} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded"
+            "$<TARGET_FILE_DIR:${GEN3_TARGET}>/mods")
+endforeach()

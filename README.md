@@ -81,6 +81,14 @@ The runtime **refuses to launch on an unrecognized ROM** — the SHA-1 must matc
 
 ## Controls
 
+Both games support Emerald-style adaptive overworld rendering. In **Mods**,
+enable **Adaptive Overworld**, choose **Fit to screen**, and apply. Resizing
+reveals more scenery and NPCs horizontally or vertically at the original
+pixel scale. Field menus follow the viewport edges; battles and full-screen
+interfaces stay centered. Distant NPCs use idle poses with native AI and
+interaction ranges. This optional feature targets the USA rev0 ROMs listed
+above. See the engine's [renderer notes](gbarecomp/docs/GEN3_ADAPTIVE_VIEW.md).
+
 | GBA button | Keyboard      |
 |------------|---------------|
 | D-Pad      | Arrow keys    |
