@@ -30,6 +30,9 @@ param(
   [string]$BuildDir = 'build-release',
   [string]$OutputDir = 'release-stage',
   [string]$EngineRoot = '',
+  [string]$RecompUiRoot = '',
+  [string]$GeneratedBiosDir = '',
+  [ValidateRange(1, 32)][int]$Jobs = 2,
   [switch]$SkipBuild
 )
 $ErrorActionPreference = 'Stop'
@@ -42,10 +45,27 @@ $out = if ([IO.Path]::IsPathRooted($OutputDir)) { [IO.Path]::GetFullPath($Output
 if ([IO.Path]::GetPathRoot($out) -eq 'C:\') { throw 'Release staging must use non-C: storage' }
 if (-not $EngineRoot) { $EngineRoot = Join-Path $root 'gbarecomp' }
 $engine = (Resolve-Path -LiteralPath $EngineRoot).Path
+if (-not $RecompUiRoot) { $RecompUiRoot = Join-Path $root 'recomp-ui' }
+$ui = (Resolve-Path -LiteralPath $RecompUiRoot).Path
+if (-not $GeneratedBiosDir) { $GeneratedBiosDir = Join-Path $engine 'src/runtime/generated_bios' }
+$generatedBiosPath = (Resolve-Path -LiteralPath $GeneratedBiosDir).Path
+foreach ($entry in @(@('gbarecomp', $engine), @('recomp-ui', $ui))) {
+  $pin = ((git -C $root ls-tree HEAD $entry[0]) -split '\s+')[2]
+  $head = (git -C $entry[1] rev-parse HEAD).Trim()
+  if ($pin -ne $head) { throw "$($entry[0]) must match pinned commit $pin" }
+  if (git -C $entry[1] status --porcelain --untracked-files=no --ignore-submodules=all) {
+    throw "$($entry[0]) has uncommitted tracked changes"
+  }
+}
+foreach ($name in @('bios_recompiled.cpp', 'bios_recompiled.h', 'bios_dispatch_table.cpp', 'bios_symbol_map.cpp')) {
+  if (-not (Test-Path -LiteralPath (Join-Path $generatedBiosPath $name))) {
+    throw "Generated BIOS input missing: $name"
+  }
+}
 $env:TEMP = Join-Path $out '.scratch'
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force $env:TEMP | Out-Null
-$Cmake = 'C:\Program Files\CMake\bin\cmake.exe'
+$Cmake = Join-Path $MingwBin 'cmake.exe'
 New-Item -ItemType Directory -Force $out | Out-Null
 
 # Games this repo ships: CMake target -> README title + decomp variant (for the
@@ -60,13 +80,16 @@ $dlls = @('SDL2.dll', 'libgcc_s_seh-1.dll', 'libstdc++-6.dll', 'libwinpthread-1.
 # ../gbarecomp (the engine checkout) via this repo's CMakeLists. SDL2 is located
 # through the msys2 mingw64 prefix - passed explicitly so a fresh checkout
 # configures without relying on auto-detection.
-if (-not $SkipBuild -and -not (Test-Path (Join-Path $build 'CMakeCache.txt'))) {
+if (-not $SkipBuild) {
   & $Cmake -S $root -B $build -G Ninja `
       -DCMAKE_C_COMPILER="$MingwBin/cc.exe" `
       -DCMAKE_CXX_COMPILER="$MingwBin/c++.exe" `
       -DCMAKE_MAKE_PROGRAM="$MingwBin/ninja.exe" `
-      -DCMAKE_BUILD_TYPE=Release "-DCMAKE_CXX_FLAGS_RELEASE=-O1 -DNDEBUG" `
+      -DCMAKE_BUILD_TYPE=Release "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG" `
       "-DGBARECOMP_ROOT=$engine" `
+      "-DRECOMP_UI_ROOT=$ui" `
+      "-DGBARECOMP_RUNTIME_UI_ROOT=$ui" `
+      "-DGBARECOMP_GENERATED_BIOS_DIR=$generatedBiosPath" `
       -DGBARECOMP_BUILD_ORACLE=OFF `
       -DGBARECOMP_MINGW_PREFIX_UNIX="/c/msys64/mingw64" `
       -DSDL2_INCLUDE_DIR="C:/msys64/mingw64/include/SDL2" `
@@ -77,7 +100,7 @@ if (-not $SkipBuild -and -not (Test-Path (Join-Path $build 'CMakeCache.txt'))) {
 foreach ($g in $games) {
   $target = $g.Target
   if (-not $SkipBuild) {
-    & $Cmake --build $build --target $target
+    & $Cmake --build $build --target $target --parallel $Jobs
     if ($LASTEXITCODE -ne 0) { throw "build failed for $target ($LASTEXITCODE)" }
   }
 
@@ -116,13 +139,11 @@ foreach ($g in $games) {
   # gaps via tcc (overlay backend auto -> tcc). See gbarecomp/tools/fetch_tcc.ps1.
   & (Join-Path $engine 'tools\fetch_tcc.ps1') -Toolchain (Join-Path $stage 'overlay_toolchain') -EngineRoot $engine -CacheDir (Join-Path $out ".toolchain-cache-$target")
 
-  # ROM SHA-1 from the variant's game.toml (best-effort; for the README only).
-  $sha = ''
-  $toml = Join-Path $root "variants\$($g.Variant)\game.toml"
-  if (Test-Path $toml) {
-    $m = Select-String -Path $toml -Pattern '^\s*sha1\s*=\s*"([0-9a-fA-F]+)"' | Select-Object -First 1
-    if ($m) { $sha = $m.Matches[0].Groups[1].Value }
-  }
+  # Select the cartridge identity; the first SHA-1 in game.toml is the BIOS.
+  $toml = Get-Content -Raw -LiteralPath (Join-Path $root "variants\$($g.Variant)\game.toml")
+  $identity = [regex]::Match($toml, '(?ms)^\[identity\]\s*$(.*?)(?=^\[|\z)').Groups[1].Value
+  $sha = [regex]::Match($identity, '(?m)^\s*sha1\s*=\s*"([0-9a-fA-F]{40})"').Groups[1].Value
+  if (-not $sha) { throw "ROM identity is missing for $($g.Variant)" }
 
   @"
 # $($g.Title) - GBA static recompilation (Windows x64)
@@ -132,7 +153,8 @@ for your ROM (and, on first run, your GBA BIOS), then the game window.
 
 Static recompilation turns the game's ARM7TDMI code into native C++ (via the
 [gbarecomp](https://github.com/mstan/gbarecomp) framework); the rest of the GBA
-(PPU, APU, DMA, timers, BIOS HLE) runs through the framework's runner core.
+(PPU, APU, DMA and timers) runs through the framework's runner core. The real
+GBA BIOS executes through the generated LLE path; supply your own BIOS dump.
 
 ## How to run
 

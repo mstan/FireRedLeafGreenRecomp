@@ -53,6 +53,12 @@ add_executable(verify_rom_hash tools/verify_rom_hash/main.cpp)
 #   and the target is a thin scaffold (main only) that still validates the
 #   wiring. game.toml is selected at runtime via the compile-def below.
 # ─────────────────────────────────────────────────────────────────────
+set(FRLG_GENERATED_OPTIMIZATION "O2" CACHE STRING "Generated CPU optimization: O1 or O2")
+set_property(CACHE FRLG_GENERATED_OPTIMIZATION PROPERTY STRINGS O1 O2)
+if(NOT FRLG_GENERATED_OPTIMIZATION MATCHES "^(O1|O2)$")
+    message(FATAL_ERROR "FRLG_GENERATED_OPTIMIZATION must be O1 or O2")
+endif()
+
 function(add_gba_variant TARGET NAME PORT WIN_TITLE GAME_NAME ROM_SHA1 ROM_CRC32)
     set(VARIANT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/variants/${NAME}")
     if(EXISTS "${VARIANT_DIR}/generated/recompiled.cpp")
@@ -80,7 +86,7 @@ function(add_gba_variant TARGET NAME PORT WIN_TITLE GAME_NAME ROM_SHA1 ROM_CRC32
         "/recompiled_[0-9]+\\.cpp$")
     if(VARIANT_RECOMPILED)
         set_source_files_properties(${VARIANT_RECOMPILED} PROPERTIES
-            COMPILE_OPTIONS "-O1;-g0")
+            COMPILE_OPTIONS "-${FRLG_GENERATED_OPTIMIZATION};-g0")
     endif()
 
     target_include_directories(${TARGET} PRIVATE
