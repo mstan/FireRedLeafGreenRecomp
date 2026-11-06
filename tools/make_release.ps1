@@ -116,6 +116,7 @@ foreach ($g in $games) {
   & "$MingwBin\strip.exe" (Join-Path $stage "$target.exe")
   if ($LASTEXITCODE -ne 0) { throw "strip failed for $target" }
   Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
+  Copy-Item -LiteralPath (Join-Path $root 'PERMISSIONS.md') -Destination $stage
   foreach ($d in $dlls) { Copy-Item (Join-Path $MingwBin $d) $stage }
 
   # recomp-ui launcher assets (fonts + img TGAs incl. this variant's box art),
