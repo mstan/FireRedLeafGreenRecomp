@@ -117,6 +117,7 @@ foreach ($g in $games) {
   if ($LASTEXITCODE -ne 0) { throw "strip failed for $target" }
   Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
   Copy-Item -LiteralPath (Join-Path $root 'PERMISSIONS.md') -Destination $stage
+  if ($g.Variant -eq 'firered') { Copy-Item -LiteralPath (Join-Path $root 'recomplauncher.json') -Destination $stage }
   foreach ($d in $dlls) { Copy-Item (Join-Path $MingwBin $d) $stage }
 
   # recomp-ui launcher assets (fonts + img TGAs incl. this variant's box art),

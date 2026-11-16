@@ -1,5 +1,7 @@
 # FireRedLeafGreenRecomp — Pokémon FireRed + LeafGreen, Recompiled
 
+<a href="https://recomplauncher.com/game/fireredleafgreenrecomp"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
+
 > _This recompilation is a **byproduct of developing
 > [gbarecomp](https://github.com/mstan/gbarecomp)** — the games are the proving ground, the framework is the goal.
 > **These are in-development previews, not finished ports — expect rough
