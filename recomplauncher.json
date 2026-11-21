@@ -1,0 +1,27 @@
+{
+    "$schema": "https://recomplauncher.com/schema/recomplauncher.json",
+    "format": 1,
+    "game": {
+        "kind": "iso",
+        "label": "Your Pokémon FireRed (USA v1.0) ROM (.gba).",
+        "dumps": [
+            {
+                "name": "USA v1.0",
+                "crc32": "dd88761c"
+            }
+        ]
+    },
+    "start": {
+        "program": [
+            "FireRedRecomp.exe"
+        ],
+        "args": [
+            "--rom",
+            "{game}"
+        ]
+    },
+    "requires": [
+        "start"
+    ],
+    "name": "Pokémon FireRed (Recompiled)"
+}
